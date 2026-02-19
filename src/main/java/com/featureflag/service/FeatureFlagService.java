@@ -1,6 +1,7 @@
 package com.featureflag.service;
 
 import com.featureflag.pojos.FeatureFlag;
+import com.featureflag.pojos.FeatureFlagUserOverride;
 
 import java.io.IOException;
 import java.util.List;
@@ -13,4 +14,6 @@ public interface FeatureFlagService {
     String deleteFlag(Long id);
 
     boolean isFlagEnabled(Long id, Long userId, boolean isAdmin);
+
+    FeatureFlagUserOverride applyUserOverride(Long fid,FeatureFlagUserOverride f);
 }

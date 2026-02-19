@@ -1,6 +1,7 @@
 package com.featureflag.controller;
 
 import com.featureflag.pojos.FeatureFlag;
+import com.featureflag.pojos.FeatureFlagUserOverride;
 import com.featureflag.service.FeatureFlagService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -68,4 +69,14 @@ public class FeatureFlagController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
+
+    @PostMapping("/{id}/override")
+    public ResponseEntity<?> overrideUser(@PathVariable Long id, @RequestBody FeatureFlagUserOverride featureFlagUserOverride){
+        try{
+            return ResponseEntity.status(HttpStatus.OK).body(featureFlagService.applyUserOverride(id,featureFlagUserOverride));
+        }catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
 }
