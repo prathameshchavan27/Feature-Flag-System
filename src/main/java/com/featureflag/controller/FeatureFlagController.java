@@ -1,5 +1,6 @@
 package com.featureflag.controller;
 
+import com.featureflag.dto.FeatureFlagRequestDTO;
 import com.featureflag.pojos.FeatureFlag;
 import com.featureflag.pojos.FeatureFlagUserOverride;
 import com.featureflag.service.FeatureFlagService;
@@ -16,9 +17,9 @@ public class FeatureFlagController {
 
 
     @PostMapping
-    public ResponseEntity<?> addFeatureFlag(@RequestBody FeatureFlag featureFlag){
+    public ResponseEntity<?> addFeatureFlag(@RequestBody FeatureFlagRequestDTO featureFlagRequestDTO){
         try{
-            featureFlagService.addFeatureFlag(featureFlag);
+            featureFlagService.addFeatureFlag(featureFlagRequestDTO);
             return ResponseEntity.status(HttpStatus.OK).body("Feature Flag Added");
         }catch (Exception e){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to save flag");

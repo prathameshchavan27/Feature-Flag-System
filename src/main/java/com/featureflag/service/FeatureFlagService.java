@@ -1,5 +1,6 @@
 package com.featureflag.service;
 
+import com.featureflag.dto.FeatureFlagRequestDTO;
 import com.featureflag.pojos.FeatureFlag;
 import com.featureflag.pojos.FeatureFlagUserOverride;
 
@@ -7,7 +8,7 @@ import java.io.IOException;
 import java.util.List;
 
 public interface FeatureFlagService {
-    public void addFeatureFlag(FeatureFlag featureFlag) throws IOException;
+    public void addFeatureFlag(FeatureFlagRequestDTO featureFlagRequestDTO) throws IOException;
     public List<FeatureFlag> getAllFlags();
     public FeatureFlag getFeatureFlag(Long id) throws IOException;
     String toggleFlag(Long id);
