@@ -1,5 +1,6 @@
 package com.featureflag.service;
 
+import com.featureflag.dto.FeatureFlagRequestDTO;
 import com.featureflag.pojos.FeatureFlag;
 import com.featureflag.pojos.FeatureFlagUserOverride;
 import com.featureflag.repository.FeatureFlagRepository;
@@ -28,8 +29,8 @@ public class FeatureFlagServiceImpl implements FeatureFlagService{
     @Autowired
     private FeatureFlagUserOverrideRepository overrideRepository;
     @Override
-    public void addFeatureFlag(FeatureFlag featureFlag) throws IOException {
-        FeatureFlag f = new FeatureFlag(featureFlag.getName(),featureFlag.isEnabled(),featureFlag.getRolloutPercentage(),featureFlag.isAdminOnly());
+    public void addFeatureFlag(FeatureFlagRequestDTO featureFlagRequestDTO) throws IOException {
+        FeatureFlag f = new FeatureFlag(featureFlagRequestDTO.getName(),featureFlagRequestDTO.isEnabled(),featureFlagRequestDTO.getRolloutPercentage(),featureFlagRequestDTO.isAdminOnly());
         featureFlagRepository.save(f);
     }
 
