@@ -7,6 +7,8 @@ import com.featureflag.repository.FeatureFlagRepository;
 import com.featureflag.repository.FeatureFlagUserOverrideRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -40,11 +42,14 @@ public class FeatureFlagServiceImpl implements FeatureFlagService{
     }
 
     @Override
+    @Cacheable(value = "flagMetadata", key = "#id")
     public FeatureFlag getFeatureFlag(Long id) throws IOException{
+        logger.info("Fetching flag from DB for id: {}", id);
         return featureFlagRepository.findById(id).orElseThrow(() -> new IOException("Feature flag not found"));
     }
 
     @Override
+    @CacheEvict(value = {"flagMetadata", "flagEvaluation"}, allEntries = true)
     public String toggleFlag(Long id) {
         FeatureFlag f = featureFlagRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Feature flag not found"));
@@ -60,6 +65,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService{
     }
 
     @Override
+    @CacheEvict(value = {"flagMetadata", "flagEvaluation"}, allEntries = true)
     public String deleteFlag(Long id) {
         FeatureFlag f = featureFlagRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Feature flag not found"));
@@ -68,7 +74,12 @@ public class FeatureFlagServiceImpl implements FeatureFlagService{
     }
 
     @Override
+    @Cacheable(
+            value = "flagEvaluation",
+            key = "#id + ':' + #userId + ':' + #isAdmin"
+    )
     public boolean isFlagEnabled(Long id, Long userId, boolean isAdmin) {
+        logger.info("Evaluating User access for feature flag from DB for id: {}", id);
         FeatureFlag f = featureFlagRepository.findById(id).orElseThrow(() -> new RuntimeException("Feature flag not found"));
         if(!f.isEnabled())
             return false;
@@ -89,6 +100,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService{
     }
 
     @Override
+    @CacheEvict(value = {"flagMetadata", "flagEvaluation"}, allEntries = true)
     public FeatureFlagUserOverride applyUserOverride(Long fid,FeatureFlagUserOverride f) {
         FeatureFlag flag = featureFlagRepository.findById(fid).orElseThrow(() -> new RuntimeException("Feature flag not found"));
 
