@@ -1,0 +1,17 @@
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: featureflag-postgres
+    environment:
+      POSTGRES_DB: feature-flag-system
+      POSTGRES_USER: prathameshchavan
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: featureflag-redis
+    ports:
+      - "6379:6379"
