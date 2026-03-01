@@ -17,7 +17,10 @@ This service allows dynamic feature rollout, per-user overrides, and percentage-
 - ✅ Request validation
 - ✅ Global exception handling
 - ✅ Spring Cache integration
+- ✅ Redis distributed caching
 - ✅ Proper cache eviction strategy
+- ✅ Actuator monitoring support
+- ✅ Dockerized deployment ready
 
 ---
 
@@ -34,6 +37,131 @@ Caching layer:
 
 ---
 
+## 🧠 How Evaluation Works
+
+1. If flag is disabled → return `false`
+2. If user override exists → return override value
+3. If `adminOnly = true` and user is not admin → return `false`
+4. If rollout = 100 → return `true`
+5. If rollout = 0 → return `false`
+6. Otherwise:
+
+```
+bucket = abs(userId.hashCode()) % 100
+return bucket < rolloutPercentage
+```
+
+This ensures deterministic rollout per user and horizontal scalability.
+
+---
+
+## ⚡ Redis Architecture Explanation
+
+In production systems, applications typically run multiple instances behind a load balancer.
+
+Local in-memory caching is not shared across instances, which can cause:
+
+- Inconsistent flag evaluations
+- Increased database load
+- Poor scalability
+
+To solve this, Redis is used as a distributed cache.
+
+### Architecture Flow
+
+Client  
+↓  
+Spring Boot Application  
+↓  
+Spring Cache Abstraction  
+↓  
+Redis (Distributed Cache)  
+↓  
+PostgreSQL
+
+### Request Flow
+
+1. Application checks Redis cache
+2. If cache hit → return instantly
+3. If cache miss → fetch from DB → compute → store in Redis → return
+
+This dramatically reduces database load for high-frequency evaluation requests.
+
+---
+
+## ⚡ Caching Strategy Explanation
+
+Two cache regions are used:
+
+### 1️⃣ flagMetadata
+
+- Key: `flagId`
+- Value: FeatureFlag entity
+- Purpose: Avoid repeated database lookups for flag configuration
+
+### 2️⃣ flagEvaluation
+
+- Key: `flagId:userId:isAdmin`
+- Value: Boolean
+- Purpose: Avoid recomputing rollout logic repeatedly
+
+### Cache Eviction
+
+Cache is evicted when:
+
+- Flag is updated
+- Flag is toggled
+- Flag is deleted
+- Override is created / updated / deleted
+
+This ensures cache consistency with the database.
+
+---
+
+## ⏳ TTL (Time-To-Live) Reasoning
+
+TTL is configured to automatically expire cache entries.
+
+Example strategy:
+
+- `flagMetadata` → Longer TTL (e.g., 10 minutes)
+- `flagEvaluation` → Shorter TTL (e.g., 5 minutes)
+
+### Why TTL?
+
+- Prevents stale distributed cache
+- Provides safety if eviction fails
+- Controls Redis memory usage
+- Ensures periodic refresh of cached data
+
+Evaluation results are more dynamic → shorter TTL  
+Metadata changes less frequently → longer TTL
+
+---
+
+## 📊 Actuator & Metrics
+
+Spring Boot Actuator is integrated for monitoring and observability.
+
+### Useful Endpoints
+
+- `/actuator/health` → Application health
+- `/actuator/metrics` → Performance metrics
+- `/actuator/caches` → Cache statistics
+- `/actuator/prometheus` → Prometheus integration
+
+### Metrics You Can Monitor
+
+- Cache hit/miss ratio
+- HTTP request count
+- Response time metrics
+- JVM memory usage
+- Thread usage
+
+This makes the service production-ready for monitoring tools like Prometheus and Grafana.
+
+---
+
 ## ⚙️ Tech Stack
 
 - Java 17+
@@ -41,9 +169,13 @@ Caching layer:
 - Spring Data JPA
 - Spring Validation
 - Spring Cache
-- H2 / PostgreSQL
+- Redis
+- PostgreSQL
+- Spring Boot Actuator
+- Micrometer
 - Lombok
 - Maven
+- Docker
 
 ---
 
@@ -57,6 +189,7 @@ com.featureflag
 ├── dto
 ├── pojos
 ├── exception
+├── config
 ```
 
 ---
@@ -86,40 +219,7 @@ com.featureflag
 
 ---
 
-## 🧠 How Evaluation Works
-
-1. If flag is disabled → return `false`
-2. If user override exists → return override value
-3. If `adminOnly = true` and user is not admin → return `false`
-4. If rollout = 100 → return `true`
-5. If rollout = 0 → return `false`
-6. Otherwise:
-
-```
-bucket = abs(userId.hashCode()) % 100
-return bucket < rolloutPercentage
-```
-
-This ensures deterministic rollout per user.
-
----
-
-## ⚡ Caching Strategy
-
-To improve performance:
-
-- Feature flag metadata is cached by ID
-- Evaluation results are cached per `(flagId:userId:isAdmin)`
-- Cache is evicted on:
-    - Flag update
-    - Flag toggle
-    - Flag deletion
-
-This reduces repeated database calls for high-frequency evaluation requests.
-
----
-
-## ▶️ Running the Application
+## ▶️ Running the Application (Without Docker)
 
 ### 1️⃣ Clone the repository
 
@@ -140,6 +240,60 @@ mvn spring-boot:run
 ```
 
 Application runs on:
+
+```
+http://localhost:8080
+```
+
+---
+
+## 🐳 Docker Setup Instructions
+
+### 1️⃣ Dockerfile
+
+```dockerfile
+FROM eclipse-temurin:17-jdk-alpine
+WORKDIR /app
+COPY target/feature-flag.jar app.jar
+ENTRYPOINT ["java","-jar","app.jar"]
+```
+
+### 2️⃣ docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - postgres
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: featureflag
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+```
+
+### 3️⃣ Run with Docker
+
+```
+docker-compose up --build
+```
+
+Application runs at:
 
 ```
 http://localhost:8080
@@ -195,12 +349,11 @@ Now user 90 always gets access regardless of rollout.
 
 ## 📈 Future Improvements
 
-- Redis-based distributed caching
 - Swagger/OpenAPI documentation
-- Metrics and monitoring (Micrometer)
 - Multi-tenant support
 - A/B testing support
 - Role-based authentication
+- Admin dashboard UI
 
 ---
 
@@ -211,7 +364,9 @@ This project demonstrates:
 - Clean layered architecture
 - Business logic separation
 - Deterministic rollout algorithm
-- Performance optimization with caching
+- Distributed caching with Redis
+- Proper cache invalidation strategies
+- Observability integration
 - Production-oriented backend thinking
 
 ---
